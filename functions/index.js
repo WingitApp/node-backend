@@ -1,6 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-admin.initializeApp();
+admin.initializeApp(functions.config().firebase);
+
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
 //
@@ -300,3 +301,62 @@ exports.onCreatePost = functions.firestore
     //         return
     //     });
     // });
+
+
+// Listens for bumps/referrals
+export const sendPushNotification = functions.database.ref('/notifications/{notificationId}').onWrite( async event => {
+
+
+    //  Grab the current value of what was written to the Realtime Database.
+    var data = event.data.val();
+
+    /**
+     * senderId: String
+     * recipientId: String
+     * type: [bump, comment]
+     */
+
+    const { senderId, recipientId, type } = data;
+
+
+    /**
+     * device {
+        platform
+        pushNotificationsEnabled: [true/false]
+        pushNotificationTokens
+        userId
+        version
+      }
+     */
+
+    const sender = await admin.firestore().collection("users").document(senderId)
+    const deviceIdTokens = await admin.firestore().collection('devices').whereField("userId", isEqualTo: recipientId).getDocuments()
+
+    const tokens = []; // user's device token
+
+    for (const token of deviceIdTokens.docs) {
+        tokens.push(token.data().device_token);
+    }
+
+      
+    // Create a notification
+
+    if(valueObject.photoUrl != null) {
+      valueObject.photoUrl= "Sent you a photo!";
+    }
+
+    const payload = {
+      notification: {
+          title: valueObject.name,
+          body: valueObject.text || valueObject.photoUrl,
+          sound: "default"
+      },
+    };
+
+    try {
+        const response = await admin.messaging().sendToDevice(tokens, payload);
+        console.log('Notification sent successfully');
+    } catch (err) {
+        console.log(err);
+    }
+});
