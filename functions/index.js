@@ -304,59 +304,57 @@ exports.onCreatePost = functions.firestore
 
 
 // Listens for bumps/referrals
-export const sendPushNotification = functions.database.ref('/notifications/{notificationId}').onWrite( async event => {
+exports.onActivityCreatePushNotifs = functions.firestore
+  .document('/activity/{recipientId}/feedItems/{itemId}')
+  .onCreate( async (snapshot, event) => {
 
+    const data = snapshot.data();
+    const { 
+      type, 
+      username, // sender
+    } = data;
+    const { recipientId } = event.params
 
-    //  Grab the current value of what was written to the Realtime Database.
-    var data = event.data.val();
-
-    /**
-     * senderId: String
-     * recipientId: String
-     * type: [bump, comment]
-     */
-
-    const { senderId, recipientId, type } = data;
-
-
-    /**
-     * device {
-        platform
-        pushNotificationsEnabled: [true/false]
-        pushNotificationTokens
-        userId
-        version
-      }
-     */
-
-    const sender = await admin.firestore().collection("users").document(senderId)
-    const deviceIdTokens = await admin.firestore().collection('devices').whereField("userId", isEqualTo: recipientId).getDocuments()
+    const devices = await admin.firestore().collection('devices').where('userId', '==', recipientId).get()
 
     const tokens = []; // user's device token
 
-    for (const token of deviceIdTokens.docs) {
-        tokens.push(token.data().device_token);
+    for (const device of devices.docs) {
+        tokens.push(device.data().pushNotificationToken);
     }
 
-      
-    // Create a notification
-
-    if(valueObject.photoUrl != null) {
-      valueObject.photoUrl= "Sent you a photo!";
+    const formatNotificationString = (type, username) => {
+      switch(type) {
+        case "connectRequest":
+          return `${username} wants to connect with you.`
+        case "connectRequestAccepted":
+          return `${username} accepted your connect request.`
+        case "referred":
+          return `${username} has referred you to help their friend.`
+        case "comment":
+          return `${username} has commented on your post`
+        default: 
+          return null;
+      }
     }
+    
+    const body = formatNotificationString(type, username);
 
-    const payload = {
-      notification: {
-          title: valueObject.name,
-          body: valueObject.text || valueObject.photoUrl,
-          sound: "default"
-      },
-    };
+    if (body) {
+      const payload = {
+        notification: {
+            body,
+            sound: "default"
+        }
+      }
 
-    try {
+      try {
         const response = await admin.messaging().sendToDevice(tokens, payload);
-        console.log('Notification sent successfully');
-    } catch (err) {
-        console.log(err);
+        functions.logger.log("push-notifications-response:", response);
+      } catch (err) {
+        functions.logger.log("notification error", err);
+      }
+    } else {
+      functions.logger.log("Activity is not of push notification type");
     }
 });
