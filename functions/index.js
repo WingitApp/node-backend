@@ -303,6 +303,8 @@ exports.onCreatePost = functions.firestore
     // });
 
 
+
+
 // Listens for bumps/referrals
 exports.onActivityCreatePushNotifs = functions.firestore
   .document('/activity/{recipientId}/feedItems/{itemId}')
@@ -320,7 +322,8 @@ exports.onActivityCreatePushNotifs = functions.firestore
     const tokens = []; // user's device token
 
     for (const device of devices.docs) {
-        tokens.push(device.data().pushNotificationToken);
+      const token = device.data().pushNotificationToken;
+      token && tokens.push(token);
     }
 
     const formatNotificationString = (type, username) => {
