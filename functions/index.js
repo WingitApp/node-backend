@@ -142,6 +142,7 @@ exports.onCreatePost = functions.firestore
 
         connectionsQuerySnapshot.forEach(doc => {
           const connectionId = doc.id;
+          
           admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).set(postData);
         });
 
@@ -183,13 +184,9 @@ exports.onCreatePost = functions.firestore
             const querySnapshot = await userFollowersRef.get();
             const connectionsQuerySnapshot = await userConnectionsRef.get();
 
-            querySnapshot.forEach(doc => {
-              const followerId = doc.id;
-              admin.firestore().collection("timeline").doc(followerId).collection("timelinePosts").doc(postId).set(postData);
-            });
             connectionsQuerySnapshot.forEach(doc => {
               const connectionId = doc.id;
-              admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).set(postData);
+              admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).delete();
             });
         });
 
