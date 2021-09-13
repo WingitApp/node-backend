@@ -51,12 +51,14 @@ exports.onCreateFollower = functions.firestore
         .document('/connections/{userId}/userConnections/{connectionId}')
         .onCreate(async (snapshot, context) => {
 
+            admin.firestore().collection("connectRequests").doc(userId).collection("userSentRequests").doc(connectionId).delete();
+            admin.firestore().collection("connectRequests").doc(connectionId).collection("userReceivedRequests").doc(userId).delete();
+
             console.log("Connection Created", snapshot.id);
             const userId = context.params.userId
             const connectionId = context.params.connectionId
 
-            // Create connecting user's request posts reference
-            const connectingUsersPostsRef = admin.firestore().collection("myPosts").doc(userId).collection("userPosts");
+            const connectingUsersPostsRef = admin.firestore().collection("all_posts").where('ownerId', '==', userId).get()
 
             // Create connected user's timeline ref
             const timelinePostsRef = admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts");
@@ -109,12 +111,17 @@ exports.onDeleteFollower = functions.firestore
             const userId = context.params.userId;
             const connectionId = context.params.connectionId;
 
+            const timelinePostsRefSelf = admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").where("ownerId", "==", userId);
+            const timelinePostsRefConnection = admin.firestore().collection("timeline").doc(userId).collection("timelinePosts").where("ownerId", "==", connectionId);
+            const querySnapshotSelf = await timelinePostsRefSelf.get();
+            const querySnapshotConnection = await timelinePostsRefConnection.get();
 
-            const timelinePostsRef = admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").where("ownerId", "==", userId);
-
-            const querySnapshot = await timelinePostsRef.get();
-
-            querySnapshot.forEach(doc => {
+            querySnapshotSelf.forEach(doc => {
+              if (doc.exists) {
+                doc.ref.delete();
+              }
+            });
+            querySnapshotConnection.forEach(doc => {
               if (doc.exists) {
                 doc.ref.delete();
               }
@@ -122,30 +129,39 @@ exports.onDeleteFollower = functions.firestore
         });
 
 exports.onCreatePost = functions.firestore
-    .document('/myPosts/{userId}/userPosts/{postId}')
+    .document('/all_posts/{postId}')
     .onCreate(async (snapshot, context) => {
 
         const postData = snapshot.data();
-        const userId = context.params.userId;
+        const { ownerId } = postData;
         const postId = context.params.postId;
 
-        const userFollowersRef = admin.firestore().collection("followers").doc(userId).collection("userFollowers");
-        const userConnectionsRef = admin.firestore().collection("connections").doc(userId).collection("userConnections");
+        const userConnectionsRef = admin.firestore().collection("connections").doc(ownerId).collection("userConnections");
 
-        const querySnapshot = await userFollowersRef.get();
         const connectionsQuerySnapshot = await userConnectionsRef.get();
-
-        querySnapshot.forEach(doc => {
-          const followerId = doc.id;
-          admin.firestore().collection("timeline").doc(followerId).collection("timelinePosts").doc(postId).set(postData);
-        });
 
         connectionsQuerySnapshot.forEach(doc => {
           const connectionId = doc.id;
-          
           admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).set(postData);
         });
+    });
 
+    exports.onUpdatePost = functions.firestore
+    .document('/all_posts/{postId}')
+    .onUpdate(async (snapshot, context) => {
+
+        const postData = snapshot.data();
+        const { ownerId } = postData;
+        const postId = context.params.postId;
+
+        const userConnectionsRef = admin.firestore().collection("connections").doc(ownerId).collection("userConnections");
+
+        const connectionsQuerySnapshot = await userConnectionsRef.get();
+
+        connectionsQuerySnapshot.forEach(doc => {
+          const connectionId = doc.id;
+          admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).set(postData);
+        });
     });
 
     exports.onCreateGemPost = functions.firestore
@@ -171,17 +187,14 @@ exports.onCreatePost = functions.firestore
         });
 
     exports.onDeletePost = functions.firestore
-        .document('/myPosts/{userId}/userPosts/{postId}')
+        .document('/all_posts/{postId}')
         .onDelete(async (snapshot, context) => {
 
             const postData = snapshot.data();
-            const userId = context.params.userId;
+            const { ownerId } = postData;
             const postId = context.params.postId;
 
-            const userFollowersRef = admin.firestore().collection("followers").doc(userId).collection("userFollowers");
-            const userConnectionsRef = admin.firestore().collection("connections").doc(userId).collection("userConnections");
-
-            const querySnapshot = await userFollowersRef.get();
+            const userConnectionsRef = admin.firestore().collection("connections").doc(ownerId).collection("userConnections");
             const connectionsQuerySnapshot = await userConnectionsRef.get();
 
             connectionsQuerySnapshot.forEach(doc => {
