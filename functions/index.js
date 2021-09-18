@@ -110,6 +110,9 @@ exports.onDeleteFollower = functions.firestore
             const userId = context.params.userId;
             const connectionId = context.params.connectionId;
 
+            // Ensure that both directions of the connection are deleted.
+            admin.firestore().collection("connections").doc(connectionId).collection("userConnections").doc(userId).delete();
+
             const timelinePostsRefSelf = admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").where("ownerId", "==", userId);
             const timelinePostsRefConnection = admin.firestore().collection("timeline").doc(userId).collection("timelinePosts").where("ownerId", "==", connectionId);
             const querySnapshotSelf = await timelinePostsRefSelf.get();
@@ -266,6 +269,21 @@ exports.onDeleteFollower = functions.firestore
 
         });
 
+        exports.onDeleteUser = functions.firestore
+        .document('/users/{userId}')
+        .onDelete(async (snapshot, context) => {
+            const deletedUserId = context.params.userId;
+
+            const connectionsForDeletedUserRef = admin.firestore().collection("connections").doc("deletedId").collection("userConnections");
+            const connectionsForDeletedUser = await connectionsForDeletedUserRef.get();
+
+            connectionsForDeletedUser.forEach(doc => {
+              if (doc.exists) {
+                doc.ref.delete();
+              }
+            });
+        });
+
         exports.onDeleteGemPost = functions.firestore
             .document('/gemPosts/{userId}/gemPosts/{postId}')
             .onDelete(async (snapshot, context) => {
@@ -284,7 +302,6 @@ exports.onDeleteFollower = functions.firestore
                   admin.firestore().collection("timeline").doc(followerId).collection("timelineGemPosts").doc(postId).set(postData);
 
                 });
-
             });
 
         // exports.onUpdate = functions.firestore
