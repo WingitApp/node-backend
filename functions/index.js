@@ -145,17 +145,57 @@ exports.onDeleteFollower = functions.firestore
         });
     });
 
+    exports.onCreateReferral = functions.firestore
+    .document('/referrals/{referralId}')
+    .onCreate(async (snapshot, contenxt) => {
+
+      /*
+       * [START] Add the sender as a "winger"
+       */
+      const referral = snapshot.data()
+      const { askId, senderId } = referral;
+
+      // Short-circuit exit if user === sender; OP cannot be winger
+      if (askId === senderId) { return }
+
+      const userRef = admin.firestore().collection("users").doc(senderId);
+      const userSnapshot = await userRef.get();
+      const user = userSnapshot.data();
+
+      const wingerUserRef =  admin.firestore().collection("all_posts").doc(askId).collection("wingers").doc(senderId)
+      const wingerUserSnapshot = await wingerUserRef.get();
+
+      if (!wingerUserSnapshot.exists) {
+        admin.firestore()
+        .collection("all_posts").doc(askId).collection("wingers").doc(senderId).set(user);
+      }
+      /*
+       * [END] Add the sender as a "winger"
+       */
+    })
+
     exports.onUpdateReferral = functions.firestore
     .document('/referrals/{referralId}')
     .onUpdate(async (snapshot, context) => {
-        const referralData = snapshot.data();
-        const { askId, receiverId, status } = referralData;
 
-        const userRef = admin.firestore().collection("users").doc(receiverId);
-        const wingerSnapshot = await userRef.get();
-        const wingerData = wingerSnapshot.data();
-        if (status == "accepted") {
-          admin.firestore().collection("all_posts").doc(askId).collection("wingers").doc(receiverId).set(wingerData);
+        const referral = snapshot.after.data();
+        const { askId, senderId, receiverId, status } = referral;
+
+        /*
+         * Add Receiver as Winger onAccept
+         */
+        if (status === "accepted") {
+
+          const receiverUserRef = admin.firestore().collection("users").doc(receiverId);
+          const receiverUserSnapshot = await receiverUserRef.get();
+          const receiver = receiverUserSnapshot.data();
+
+          const wingerUserRef =  admin.firestore().collection("all_posts").doc(askId).collection("wingers").doc(receiverId)
+          const wingerUserSnapshot = await wingerUserRef.get();
+
+          if (!wingerUserSnapshot.exists) {
+            admin.firestore().collection("all_posts").doc(askId).collection("wingers").doc(receiverId).set(receiver);
+          }
         }
     });
 
@@ -352,12 +392,15 @@ exports.onActivityCreatePushNotifs = functions.firestore
 
     const devices = await admin.firestore().collection('devices').where('userId', '==', recipientId).get()
 
-    const tokens = []; // user's device token
+    const tokenSet = new Set(); // user's unique device token
 
     for (const device of devices.docs) {
       const token = device.data().pushNotificationToken;
-      token && tokens.push(token);
+      
+      token && tokenSet.add(token);
     }
+
+    const tokens = [...tokenSet]; 
 
     const formatNotificationString = (type, username) => {
       switch(type) {
