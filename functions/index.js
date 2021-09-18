@@ -147,10 +147,10 @@ exports.onDeleteFollower = functions.firestore
 
     exports.onCreateReferral = functions.firestore
     .document('/referrals/{referralId}')
-    .onCreate(async (snapshot, contenxt) => {
+    .onCreate(async (snapshot, context) => {
 
       /*
-       * [START] Add the sender as a "winger"
+       * [START] Add the sender into "bumpers" collection
        */
       const referral = snapshot.data()
       const { askId, senderId } = referral;
@@ -162,12 +162,12 @@ exports.onDeleteFollower = functions.firestore
       const userSnapshot = await userRef.get();
       const user = userSnapshot.data();
 
-      const wingerUserRef =  admin.firestore().collection("all_posts").doc(askId).collection("wingers").doc(senderId)
-      const wingerUserSnapshot = await wingerUserRef.get();
+      const bumperUserRef = admin.firestore().collection("all_posts").doc(askId).collection("bumpers").doc(senderId)
+      const bumperUserSnapshot = await bumperUserRef.get();
 
-      if (!wingerUserSnapshot.exists) {
+      if (!bumperUserSnapshot.exists) {
         admin.firestore()
-        .collection("all_posts").doc(askId).collection("wingers").doc(senderId).set(user);
+        .collection("all_posts").doc(askId).collection("bumpers").doc(senderId).set(user);
       }
       /*
        * [END] Add the sender as a "winger"
