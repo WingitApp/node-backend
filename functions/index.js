@@ -54,6 +54,9 @@ exports.onCreateFollower = functions.firestore
             const userId = context.params.userId
             const connectionId = context.params.connectionId
 
+            // Ensure connection is bi-directional
+            admin.firestore().collection("connections").doc(connectionId).collection("userConnections").doc(userId).set({});
+
             admin.firestore().collection("connectRequests").doc(userId).collection("userSentRequests").doc(connectionId).delete();
             admin.firestore().collection("connectRequests").doc(connectionId).collection("userReceivedRequests").doc(userId).delete();
 
