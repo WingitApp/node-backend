@@ -152,7 +152,7 @@ admin.initializeApp(functions.config().firebase);
     .document('/all_posts/{postId}')
     .onUpdate(async (snapshot, context) => {
 
-        const postData = snapshot.data();
+        const postData = snapshot.after.data();
         const { ownerId } = postData;
         const { postId } = context.params;
 
@@ -173,7 +173,7 @@ admin.initializeApp(functions.config().firebase);
     exports.onUpdateTimelinePost = functions.firestore
     .document('/timeline/{ownerId}/timelinePosts/{postId}')
     .onUpdate(async (snapshot, context) => {
-      const postData = snapshot.data();
+      const postData = snapshot.after.data();
       const { postId, ownerId } = context.params;
 
       // update the profile of user (this will trigger the update for connection's timeline)
