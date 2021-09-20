@@ -94,26 +94,34 @@ admin.initializeApp(functions.config().firebase);
        * [START] Add the sender into "bumpers" collection
        */
       const referral = snapshot.data()
-      const { askId, senderId } = referral;
+      const { askId, senderId, receiverId } = referral;
 
-      // Short-circuit exit if user === sender; OP cannot be winger
-      if (askId === senderId) { return }
+      const senderUserRef = admin.firestore().collection("users").doc(senderId);
+      const senderUserSnapshot = await senderUserRef.get();
+      const sender = senderUserSnapshot.data();
 
-      const userRef = admin.firestore().collection("users").doc(senderId);
-      const userSnapshot = await userRef.get();
-      const user = userSnapshot.data();
+      const receiverUserRef = admin.firestore().collection("users").doc(receiverId);
+      const receiverUserSnapshot = await receiverUserRef.get();
+      const receiver = receiverUserSnapshot.data();
 
-      const bumperUserRef = admin.firestore().collection("all_posts").doc(askId).collection("bumpers").doc(senderId)
-      const bumperUserSnapshot = await bumperUserRef.get();
+      const senderBumpedPostsRef = await senderUserRef.collection("bumpedPosts").doc(askId).collection("users")
 
-      if (!bumperUserSnapshot.exists) {
-        admin.firestore()
-        .collection("all_posts").doc(askId).collection("bumpers").doc(senderId).set(user);
+      const receiverIsInSenderBumpedGroup = await senderBumpedPostsRef.doc(receiverId).get();
+      const senderIsInPostBumperGroup = await admin.firestore().collection("all_posts").doc(askId).collection("bumpers").doc(senderId).get();
+
+
+      if (!senderIsInPostBumperGroup .exists) {
+        // add receiver to post's bumper group
+        admin.firestore().collection("all_posts").doc(askId).collection("bumpers").doc(senderId).set(sender);
       }
-      /*
-       * [END] Add the sender as a "winger"
-       */
-    })
+
+      if (!receiverIsInSenderBumpedGroup.exists) {
+        // add receiver to user's post bump group
+        senderBumpedPostsRef.doc(receiverId).set(receiver);
+      } 
+    });
+
+
 
     exports.onUpdateReferral = functions.firestore
     .document('/referrals/{referralId}')
@@ -146,16 +154,30 @@ admin.initializeApp(functions.config().firebase);
 
         const postData = snapshot.data();
         const { ownerId } = postData;
-        const postId = context.params.postId;
+        const { postId } = context.params;
 
         const userConnectionsRef = admin.firestore().collection("connections").doc(ownerId).collection("userConnections");
 
         const connectionsQuerySnapshot = await userConnectionsRef.get();
 
         connectionsQuerySnapshot.forEach(doc => {
+          // update the timeline of user's connections
           const connectionId = doc.id;
           admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).set(postData);
         });
+
+        // update the timeline of user
+        admin.firestore().collection("timeline").doc(ownerId).collection("timelinePosts").doc(postId).set(postData)
+    });
+
+    exports.onUpdateTimelinePost = functions.firestore
+    .document('/timeline/{ownerId}/timelinePosts/{postId}')
+    .onUpdate(async (snapshot, context) => {
+      const postData = snapshot.data();
+      const { postId, ownerId } = context.params;
+
+      // update the profile of user (this will trigger the update for connection's timeline)
+      admin.firestore().collection("all_posts").doc(postId).set(postData)
     });
 
     exports.onDeletePost = functions.firestore
