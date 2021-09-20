@@ -9,44 +9,6 @@ admin.initializeApp(functions.config().firebase);
 //  response.send("Hello from Firebase!");
 // });
 
-exports.onCreateFollower = functions.firestore
-    .document('/followers/{userId}/userFollowers/{followerId}')
-    .onCreate(async (snapshot, context) => {
-
-        console.log("Follower Created", snapshot.id);
-        const userId = context.params.userId
-        const followerId = context.params.followerId
-
-        // Create followed users posts reference
-        const followedUserPostRef = admin.firestore().collection("myPosts").doc(userId).collection("userPosts");
-        const followedUserGemPostRef = admin.firestore().collection("gemPosts").doc(userId).collection("gemPosts");
-
-        // Create following user's timeline ref
-        const timelinePostsRef = admin.firestore().collection("timeline").doc(followerId).collection("timelinePosts");
-        const timelineGemPostsRef = admin.firestore().collection("timeline").doc(followerId).collection("timelineGemPosts")
-
-        // Get followed users myPosts
-        const querySnapshot = await followedUserPostRef.get();
-        const queryGemSnapshot = await followedUserGemPostRef.get();
-
-        // Add each user post to following user's timelinePosts
-        querySnapshot.forEach(doc => {
-          if (doc.exists) {
-             const postId = doc.id
-             const postData = doc.data();
-             timelinePostsRef.doc(postId).set(postData);
-          }
-        });
-        queryGemSnapshot.forEach(doc => {
-          if (doc.exists) {
-             const postId = doc.id
-             const postData = doc.data();
-             timelineGemPostsRef.doc(postId).set(postData);
-          }
-        });
-
-    });
-
     exports.onCreateConnection = functions.firestore
         .document('/connections/{userId}/userConnections/{connectionId}')
         .onCreate(async (snapshot, context) => {
@@ -77,33 +39,6 @@ exports.onCreateFollower = functions.firestore
               }
             });
         });
-
-exports.onDeleteFollower = functions.firestore
-    .document('/followers/{userId}/userFollowers/{followerId}')
-    .onDelete(async (snapshot, context) => {
-
-        console.log("Follower Deleted", snapshot.id);
-        const userId = context.params.userId
-        const followerId = context.params.followerId
-
-
-        const timelinePostsRef = admin.firestore().collection("timeline").doc(followerId).collection("timelinePosts").where("ownerId", "==", userId);
-        const timelineGemPostsRef = admin.firestore().collection("timeline").doc(followerId).collection("timelineGemPosts").where("ownerId", "==", userId);
-
-        const querySnapshot = await timelinePostsRef.get();
-        const queryGemSnapshot = await timelineGemPostsRef.get();
-
-        querySnapshot.forEach(doc => {
-          if (doc.exists) {
-            doc.ref.delete()
-          }
-        });
-        queryGemSnapshot.forEach(doc => {
-          if (doc.exists) {
-            doc.ref.delete()
-          }
-        });
-    });
 
     exports.onDeleteConnection = functions.firestore
         .document('/connections/{userId}/userConnections/{connectionId}')
@@ -223,28 +158,6 @@ exports.onDeleteFollower = functions.firestore
         });
     });
 
-    exports.onCreateGemPost = functions.firestore
-        .document('/gemPosts/{userId}/gemPosts/{postId}')
-        .onCreate(async (snapshot, context) => {
-
-            const postData = snapshot.data();
-            const userId = context.params.userId;
-            const postId = context.params.postId;
-
-            const userFollowersRef = admin.firestore().collection("followers").doc(userId).collection("userFollowers");
-
-            const querySnapshot = await userFollowersRef.get();
-
-            querySnapshot.forEach(doc => {
-              const followerId = doc.id;
-
-              admin.firestore().collection("timeline").doc(followerId).collection("timelineGemPosts").doc(postId).set(postData);
-
-
-            });
-
-        });
-
     exports.onDeletePost = functions.firestore
         .document('/all_posts/{postId}')
         .onDelete(async (snapshot, context) => {
@@ -286,26 +199,6 @@ exports.onDeleteFollower = functions.firestore
               }
             });
         });
-
-        exports.onDeleteGemPost = functions.firestore
-            .document('/gemPosts/{userId}/gemPosts/{postId}')
-            .onDelete(async (snapshot, context) => {
-
-                const postData = snapshot.data();
-                const userId = context.params.userId;
-                const postId = context.params.postId;
-
-                const userFollowersRef = admin.firestore().collection("followers").doc(userId).collection("userFollowers");
-
-                const querySnapshot = await userFollowersRef.get();
-
-                querySnapshot.forEach(doc => {
-                  const followerId = doc.id;
-
-                  admin.firestore().collection("timeline").doc(followerId).collection("timelineGemPosts").doc(postId).set(postData);
-
-                });
-            });
 
 // Listens for bumps/referrals
 exports.onActivityCreatePushNotifs = functions.firestore
