@@ -219,8 +219,8 @@ exports.maintainTimestamps = functions.firestore
         const { ownerId } = newPostData;
         const { postId } = context.params;
 
-        // Reject updates that occur within 1000 milliseconds of their previous update
-        if (after.updatedAt.toMillis() - before.updatedAt.toMillis < 1000) {
+        // Reject updates that occur within 500 milliseconds of their previous update
+        if (newPostData.updatedAt.toMillis() - oldPostData.updatedAt.toMillis() < 500) {
           return;
         }
 
@@ -245,12 +245,12 @@ exports.maintainTimestamps = functions.firestore
         
         const { postId, ownerId } = context.params;
 
-        // Reject updates that occur within 1000 milliseconds of their previous update
-        if (newPostData.updatedAt.toMillis() - oldPostData.updatedAt.toMillis() < 1000) {
+        // Reject updates that occur within 500 milliseconds of their previous update
+        if (newPostData.updatedAt.toMillis() - oldPostData.updatedAt.toMillis() < 500) {
           return;
         }
 
-        // update the profile of user (this will trigger the update for connection's timeline)
+        // Update the user's post (this will trigger the update for connection's timeline)
         admin.firestore().collection("all_posts").doc(postId).set(newPostData)
     });
 
