@@ -213,17 +213,16 @@ exports.maintainTimestamps = functions.firestore
     exports.onUpdatePost = functions.firestore
       .document('/all_posts/{postId}')
       .onUpdate(async (snapshot, context) => {
+        const newPostData = snapshot.after.data();
+        const oldPostData = snapshot.before.data();
+
+        const { ownerId } = newPostData;
+        const { postId } = context.params;
 
         // Reject updates that occur within 1000 milliseconds of their previous update
-        const after = snapshot.after.exists ? snapshot.after.data() : null;
-        const before = snapshot.before.exists ? snapshot.before.data() : null;
         if (after.updatedAt.toMillis() - before.updatedAt.toMillis < 1000) {
           return;
         }
-
-        const postData = snapshot.after.data();
-        const { ownerId } = postData;
-        const { postId } = context.params;
 
         const userConnectionsRef = admin.firestore().collection("connections").doc(ownerId).collection("userConnections");
         const connectionsQuerySnapshot = await userConnectionsRef.get();
@@ -231,29 +230,28 @@ exports.maintainTimestamps = functions.firestore
         connectionsQuerySnapshot.forEach(doc => {
           // update the timeline of user's connections
           const connectionId = doc.id;
-          admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).set(postData);
+          admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).set(newPostData);
         });
 
         // update the timeline of user
-        admin.firestore().collection("timeline").doc(ownerId).collection("timelinePosts").doc(postId).set(postData)
+        admin.firestore().collection("timeline").doc(ownerId).collection("timelinePosts").doc(postId).set(newPostData)
     });
 
     exports.onUpdateTimelinePost = functions.firestore
       .document('/timeline/{ownerId}/timelinePosts/{postId}')
       .onUpdate(async (snapshot, context) => {
-
-        // Reject updates that occur within 1000 milliseconds of their previous update
-        const after = snapshot.after.exists ? snapshot.after.data() : null;
-        const before = snapshot.before.exists ? snapshot.before.data() : null;
-        if (after.updatedAt.toMillis() - before.updatedAt.toMillis() < 1000) {
-          return;
-        }
+        const newPostData = snapshot.after.data();
+        const oldPostData = snapshot.before.data();
         
-        const postData = snapshot.after.data();
         const { postId, ownerId } = context.params;
 
+        // Reject updates that occur within 1000 milliseconds of their previous update
+        if (newPostData.updatedAt.toMillis() - oldPostData.updatedAt.toMillis() < 1000) {
+          return;
+        }
+
         // update the profile of user (this will trigger the update for connection's timeline)
-        admin.firestore().collection("all_posts").doc(postId).set(postData)
+        admin.firestore().collection("all_posts").doc(postId).set(newPostData)
     });
 
     exports.onDeletePost = functions.firestore
