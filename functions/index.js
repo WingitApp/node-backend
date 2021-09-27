@@ -264,6 +264,10 @@ exports.maintainTimestamps = functions.firestore
 
             const userConnectionsRef = admin.firestore().collection("connections").doc(ownerId).collection("userConnections");
             const connectionsQuerySnapshot = await userConnectionsRef.get();
+            connectionsQuerySnapshot.forEach(doc => {
+              const connectionId = doc.id;
+              admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).delete();
+            });
 
             const referralsReceivedForPost = admin.firestore().collection("referrals").where('askId', '==', postId);
             const referralsSnapshot = await referralsReceivedForPost.get();
@@ -273,9 +277,29 @@ exports.maintainTimestamps = functions.firestore
               admin.firestore().collection("referrals").doc(referralId).delete();
             });
 
-            connectionsQuerySnapshot.forEach(doc => {
-              const connectionId = doc.id;
-              admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").doc(postId).delete();
+            const commentsForPost = admin.firestore().collection("comments").doc(postId).collection("postComments");
+            const commentsSnapshot = await commentsForPost.get();
+
+            commentsSnapshot.forEach(doc => {
+              doc.ref.delete();
+            });
+
+            // activity for a post could potentially end up in any user's notifications, so we need to check all users
+            const activityRef = admin.firestore().collection("activity");
+            const allUsersSnapshot = await activityRef.get();
+            
+            const feedItemQueries = []
+            allUsersSnapshot.forEach(doc => {
+              const userId = doc.id;
+              postActivitiesRef = admin.firestore().collection("activity").doc(userId).collection("feedItems").where('postId', '==', postId);
+              feedItemQueries.push(postActivitiesRef.get());
+            });
+
+            const feedItemsSnapshots = await Promise.all(feedItemQueries)
+            feedItemsSnapshots.forEach (snapshot => {
+              snapshot.forEach(doc => {
+                doc.ref.delete();
+              });
             });
         });
 
