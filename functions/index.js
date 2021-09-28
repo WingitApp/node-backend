@@ -156,19 +156,25 @@ exports.maintainTimestamps = functions.firestore
        * [START] Add the sender into "bumpers" collection
        */
       const referral = snapshot.data()
-      const { askId, senderId, receiverId } = referral;
+      const { askId, senderId, receiverId, recipientId } = referral;
 
       const senderUserRef = admin.firestore().collection("users").doc(senderId);
       const senderUserSnapshot = await senderUserRef.get();
       const sender = senderUserSnapshot.data();
 
+      // receiverId has been deprecated and we will use recipientId instead now
       const receiverUserRef = admin.firestore().collection("users").doc(receiverId);
       const receiverUserSnapshot = await receiverUserRef.get();
       const receiver = receiverUserSnapshot.data();
 
-      const senderBumpedPostsRef = await senderUserRef.collection("bumpedPosts").doc(askId).collection("users")
+      const recipientUserRef = admin.firestore().collection("users").doc(recipientId);
+      const recipientUserSnapshot = await recipientUserRef.get();
+      const recipient = recipientUserSnapshot.data();
+
+      const senderBumpedPostsRef = senderUserRef.collection("bumpedPosts").doc(askId).collection("users")
 
       const receiverIsInSenderBumpedGroup = await senderBumpedPostsRef.doc(receiverId).get();
+      const recipientIsInSenderBumpedGroup = await senderBumpedPostsRef.doc(recipientId).get();
       const senderIsInPostBumperGroup = await admin.firestore().collection("all_posts").doc(askId).collection("bumpers").doc(senderId).get();
 
 
@@ -181,6 +187,11 @@ exports.maintainTimestamps = functions.firestore
         // add receiver to user's post bump group
         senderBumpedPostsRef.doc(receiverId).set(receiver);
       } 
+
+      if (!recipientIsInSenderBumpedGroup.exists) {
+        // add recipient to user's post bump group
+        senderBumpedPostsRef.doc(recipientId).set(recipient);
+      } 
     });
 
 
@@ -190,22 +201,33 @@ exports.maintainTimestamps = functions.firestore
     .onUpdate(async (snapshot, context) => {
 
         const referral = snapshot.after.data();
-        const { askId, senderId, receiverId, status } = referral;
+        const { askId, senderId, receiverId, recipientId, status } = referral;
 
         /*
          * Add Receiver as Winger onAccept
          */
         if (status === "accepted") {
-
+          
+          // receiverId has been deprecated and we will use recipientId instead now
           const receiverUserRef = admin.firestore().collection("users").doc(receiverId);
           const receiverUserSnapshot = await receiverUserRef.get();
           const receiver = receiverUserSnapshot.data();
+
+          const recipientUserRef = admin.firestore().collection("users").doc(recipientId);
+          const recipientUserSnapshot = await recipientUserRef.get();
+          const recipient = recipientUserSnapshot.data();
 
           const wingerUserRef =  admin.firestore().collection("all_posts").doc(askId).collection("wingers").doc(receiverId)
           const wingerUserSnapshot = await wingerUserRef.get();
 
           if (!wingerUserSnapshot.exists) {
             admin.firestore().collection("all_posts").doc(askId).collection("wingers").doc(receiverId).set(receiver);
+          }
+          
+          const wingerRef =  admin.firestore().collection("all_posts").doc(askId).collection("wingers").doc(recipientId)
+          const wingerSnapshot = await wingerRef.get();
+          if (!wingerSnapshot.exists) {
+            admin.firestore().collection("all_posts").doc(askId).collection("wingers").doc(recipientId).set(recipient);
           }
         }
     });
