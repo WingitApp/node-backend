@@ -71,6 +71,19 @@ exports.maintainTimestamps = functions.firestore
     return null;
 });
 
+exports.onCreateComment = functions.firestore
+  .document('/comments/{postId}/postComments/{commentId}')
+  .onCreate(async (snapshot, context) => {
+      const postId = context.params.postId
+      const commenterId = snapshot.data().ownerId
+
+      // Get reference to the post's followers collection
+      const postFollowersRef = admin.firestore().collection("all_posts").doc(postId).collection("followers");
+
+      // Add the commenter as a "Follower" of the post
+      await postFollowersRef.doc(commenterId).set({});
+  });
+
     exports.onCreateConnection = functions.firestore
         .document('/connections/{userId}/userConnections/{connectionId}')
         .onCreate(async (snapshot, context) => {
@@ -395,17 +408,33 @@ exports.maintainTimestamps = functions.firestore
     // Convert UserActivity data into respective Notification data
     let notificationData = {
       activityId: activityId,
+      // Notification POV is opposite of the activity POV
       correspondingUserDisplayName: activityData.currentUserDisplayName,
       correspondingUserId: currentUserId,
       mediaUrl: mediaUrl,
       notificationType: activityData.activityType,
+      postId: activityData.postId,
       postTitle: activityData.postTitle,
       postType: activityData.postType
     };
-    
-    // Generate a new notification doc.
-    var newNotificationRef = admin.firestore().collection("notifications").doc(currentUserId).collection("notifications").doc()
-    newNotificationRef.set(notificationData)
+
+    if (activityType == "postComment") {
+      // Get reference to the post's followers collection
+      const postFollowersRef = admin.firestore().collection("all_posts").doc(postId).collection("followers");
+      const postFollowersGet = postFollowersRef.get();
+
+      // Notify the post's followers of the new comment
+      const notificationSetCalls = [];
+      postFollowersGet.forEach(doc => {
+        if (doc.exists && doc.id != currentUserId) {
+          notificationSetCalls.push();
+        }
+      });
+    } else {
+      // Generate a new notification doc.
+      var newNotificationRef = admin.firestore().collection("notifications").doc(currentUserId).collection("notifications").doc()
+      newNotificationRef.set(notificationData)
+    }
   });
 
 exports.onCreateNotificationCreatePush = functions.firestore
