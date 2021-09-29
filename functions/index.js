@@ -283,6 +283,7 @@ exports.maintainTimestamps = functions.firestore
             const postData = snapshot.data();
             const { ownerId } = postData;
             const postId = context.params.postId;
+            await admin.firestore().collection("timeline").doc(ownerId).collection("timelinePosts").doc(postId).delete();
 
             const userConnectionsRef = admin.firestore().collection("connections").doc(ownerId).collection("userConnections");
             const connectionsQuerySnapshot = await userConnectionsRef.get();
@@ -293,18 +294,22 @@ exports.maintainTimestamps = functions.firestore
 
             const referralsReceivedForPost = admin.firestore().collection("referrals").where('askId', '==', postId);
             const referralsSnapshot = await referralsReceivedForPost.get();
-
+            
+            const referralDeleteCalls = [];
             referralsSnapshot.forEach(doc => {
               const referralId = doc.id;
-              admin.firestore().collection("referrals").doc(referralId).delete();
+              referralDeleteCalls.push(admin.firestore().collection("referrals").doc(referralId).delete());
             });
+            await Promise.all(referralDeleteCalls);
 
             const commentsForPost = admin.firestore().collection("comments").doc(postId).collection("postComments");
             const commentsSnapshot = await commentsForPost.get();
-
+            
+            const commentDeleteCalls = [];
             commentsSnapshot.forEach(doc => {
-              doc.ref.delete();
+              commentDeleteCalls(doc.ref.delete());
             });
+            await Promise.all(commentDeleteCalls);
 
             // activity for a post could potentially end up in any user's notifications, so we need to check all users
             const activityRef = admin.firestore().collection("activity");
@@ -318,11 +323,13 @@ exports.maintainTimestamps = functions.firestore
             });
 
             const feedItemsSnapshots = await Promise.all(feedItemQueries)
-            feedItemsSnapshots.forEach (snapshot => {
+            const feedItemDeleteCalls = []
+            feedItemsSnapshots.forEach(snapshot => {
               snapshot.forEach(doc => {
-                doc.ref.delete();
+                feedItemDeleteCalls.push(doc.ref.delete());
               });
             });
+            await Promise.all(feedItemDeleteCalls);
         });
 
         exports.onDeleteUser = functions.firestore
