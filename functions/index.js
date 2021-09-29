@@ -216,7 +216,7 @@ exports.maintainTimestamps = functions.firestore
       const senderIsInPostBumperGroup = await admin.firestore().collection("all_posts").doc(askId).collection("bumpers").doc(senderId).get();
 
 
-      if (!senderIsInPostBumperGroup .exists) {
+      if (!senderIsInPostBumperGroup.exists) {
         // add receiver to post's bumper group
         admin.firestore().collection("all_posts").doc(askId).collection("bumpers").doc(senderId).set(sender);
       }
@@ -384,6 +384,103 @@ exports.maintainTimestamps = functions.firestore
             });
             await Promise.all(connectionDeleteCalls);
         });
+
+  exports.onCreateUserActivity = functions.firestore
+  .document('/userActivity/{currentUserId}/activity/{activityId}')
+  .onCreate( async (snapshot, event) => {
+
+    const activityData = snapshot.data();
+    const { activityId, currentUserId } = event.params
+
+    // Convert UserActivity data into respective Notification data
+    let notificationData = {
+      activityId: activityId,
+      correspondingUserDisplayName: activityData.currentUserDisplayName,
+      correspondingUserId: currentUserId,
+      mediaUrl: mediaUrl,
+      notificationType: activityData.activityType,
+      postTitle: activityData.postTitle,
+      postType: activityData.postType
+    };
+    
+    // Generate a new notification doc.
+    var newNotificationRef = admin.firestore().collection("notifications").doc(currentUserId).collection("notifications").doc()
+    newNotificationRef.set(notificationData)
+  });
+
+exports.onCreateNotificationCreatePush = functions.firestore
+  .document('/notifications/{userId}/notifications/{notificationId}')
+  .onCreate( async (snapshot, event) => {
+
+    const data = snapshot.data();
+    const { 
+      activityId,
+      currentUserDisplayName,
+      currentUserId,
+      mediaUrl,
+      notificationType,
+      postTitle,
+      postType,
+    } = data;
+    const { recipientId } = event.params
+
+    const formatNotificationString = (notificationType, currentUserDisplayName) => {
+      switch(notificationType) {
+        case "acceptConnectRequest":
+          return `${currentUserDisplayName} accepted your connect request.`
+        case "followPost":
+          return `${currentUserDisplayName} has referred you to help their friend.`
+        case "postAsk":
+          return `${currentUserDisplayName} has commented on your post`
+        case "postComment":
+          return `${currentUserDisplayName} wants to connect with you.`
+        case "reactToComment":
+          return `${currentUserDisplayName} reacted to your comment.`
+        case "referConnection":
+          return `${currentUserDisplayName} has referred you to help their friend.`
+        case "sendConnectRequest":
+          return `${currentUserDisplayName} wants to connect with you.`
+        case "referred":
+          return `${currentUserDisplayName} has referred you to help their friend.`
+        case "wingAsk":
+          return `${currentUserDisplayName} has winged your post `
+        default: 
+          return null;
+      }
+    }
+
+    const devices = await admin.firestore().collection('devices').where('userId', '==', recipientId).get()
+
+    const tokenSet = new Set(); // user's unique device token
+
+    for (const device of devices.docs) {
+      const token = device.data().pushNotificationToken;
+      
+      token && tokenSet.add(token);
+    }
+
+    const tokens = [...tokenSet]; 
+    
+    const body = formatNotificationString(type, username);
+
+    if (body) {
+      const payload = {
+        notification: {
+            body,
+            sound: "default"
+        }
+      }
+
+      try {
+        const response = await admin.messaging().sendToDevice(tokens, payload);
+        functions.logger.log("push-notifications-response:", response);
+      } catch (err) {
+        functions.logger.log("notification error", err);
+      }
+    } else {
+      functions.logger.log("Notification is not of push notification type");
+    }
+});
 
 // Listens for bumps/referrals
 exports.onActivityCreatePushNotifs = functions.firestore
