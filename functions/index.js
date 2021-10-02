@@ -444,8 +444,7 @@ exports.onCreateNotificationCreatePush = functions.firestore
     const data = snapshot.data();
     const { 
       activityId,
-      currentUserDisplayName,
-      currentUserId,
+      correspondingUserDisplayName,
       mediaUrl,
       notificationType,
       postTitle,
@@ -453,26 +452,20 @@ exports.onCreateNotificationCreatePush = functions.firestore
     } = data;
     const { recipientId } = event.params
 
-    const formatNotificationString = (notificationType, currentUserDisplayName) => {
+    const formatNotificationString = (notificationType, correspondingUserDisplayName) => {
       switch(notificationType) {
         case "acceptConnectRequest":
-          return `${currentUserDisplayName} accepted your connect request.`
-        case "followPost":
-          return `${currentUserDisplayName} has referred you to help their friend.`
-        case "postAsk":
-          return `${currentUserDisplayName} has commented on your post`
+          return `${correspondingUserDisplayName} accepted your connect request.`
         case "postComment":
-          return `${currentUserDisplayName} wants to connect with you.`
+          return `${correspondingUserDisplayName} wants to connect with you.`
         case "reactToComment":
-          return `${currentUserDisplayName} reacted to your comment.`
+          return `${correspondingUserDisplayName} reacted to your comment.`
         case "referConnection":
-          return `${currentUserDisplayName} has referred you to help their friend.`
+          return `${correspondingUserDisplayName} has referred you to help their friend.`
         case "sendConnectRequest":
-          return `${currentUserDisplayName} wants to connect with you.`
-        case "referred":
-          return `${currentUserDisplayName} has referred you to help their friend.`
+          return `${correspondingUserDisplayName} wants to connect with you.`
         case "wingAsk":
-          return `${currentUserDisplayName} has winged your post `
+          return `${correspondingUserDisplayName} has winged your post `
         default: 
           return null;
       }
