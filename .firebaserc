@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "wingitapp-1fe28"
-  }
+    "default": "wingitapp-1fe28",
+    "staging": "wingit-staging-83e2d",
+    "prod": "wingitapp-1fe28"
+  },
+  "targets": {}
 }
