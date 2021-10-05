@@ -102,33 +102,71 @@ exports.maintainTimestamps = functions.firestore
             });
         });
 
-    exports.onDeleteConnection = functions.firestore
-        .document('/connections/{userId}/userConnections/{connectionId}')
-        .onDelete(async (snapshot, context) => {
+    exports.onDeleteSentConnectRequest = functions.firestore
+    .document('/connectRequests/{senderId}/userSentRequests/{recipientId}')
+    .onDelete(async (snapshot, context) => {
+        const senderId = context.params.senderId;
+        const recipientId = context.params.recipientId;
 
-            console.log("Connection Deleted", snapshot.id);
-            const userId = context.params.userId;
-            const connectionId = context.params.connectionId;
+        // Ensure that both directions of the connect request are deleted.
+        await admin.firestore().collection("connectRequests").doc(recipientId).collection("userReceivedRequests").doc(senderId).delete();
 
-            // Ensure that both directions of the connection are deleted.
-            admin.firestore().collection("connections").doc(connectionId).collection("userConnections").doc(userId).delete();
+        const connectRequestNotificationQuery = admin.firestore().collection("activity").doc(recipientId).collection("feedItems").where("type", "==", "connectRequest").where("userId", "==", senderId);
+        const connectRequestNotificationSnapshot = await connectRequestNotificationQuery.get();
 
-            const timelinePostsRefSelf = admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").where("ownerId", "==", userId);
-            const timelinePostsRefConnection = admin.firestore().collection("timeline").doc(userId).collection("timelinePosts").where("ownerId", "==", connectionId);
-            const querySnapshotSelf = await timelinePostsRefSelf.get();
-            const querySnapshotConnection = await timelinePostsRefConnection.get();
-
-            querySnapshotSelf.forEach(doc => {
-              if (doc.exists) {
-                doc.ref.delete();
-              }
-            });
-            querySnapshotConnection.forEach(doc => {
-              if (doc.exists) {
-                doc.ref.delete();
-              }
-            });
+        connectRequestNotificationSnapshot.forEach(doc => {
+          if (doc.exists) {
+            doc.ref.delete();
+          }
         });
+    });
+
+    exports.onDeleteReceivedConnectRequest = functions.firestore
+    .document('/connectRequests/{recipientId}/userReceivedRequests/{senderId}')
+    .onDelete(async (snapshot, context) => {
+      const recipientId = context.params.recipientId;
+      const senderId = context.params.senderId;
+
+      // Ensure that both directions of the connect request are deleted.
+      await admin.firestore().collection("connectRequests").doc(senderId).collection("userSentRequests").doc(recipientId).delete();
+
+      const connectRequestNotificationQuery = admin.firestore().collection("activity").doc(recipientId).collection("feedItems").where("type", "==", "connectRequest").where("userId", "==", senderId);
+      const connectRequestNotificationSnapshot = await connectRequestNotificationQuery.get();
+
+      connectRequestNotificationSnapshot.forEach(doc => {
+        if (doc.exists) {
+          doc.ref.delete();
+        }
+      });
+    });
+
+    exports.onDeleteConnection = functions.firestore
+      .document('/connections/{userId}/userConnections/{connectionId}')
+      .onDelete(async (snapshot, context) => {
+
+          console.log("Connection Deleted", snapshot.id);
+          const userId = context.params.userId;
+          const connectionId = context.params.connectionId;
+
+          // Ensure that both directions of the connection are deleted.
+          admin.firestore().collection("connections").doc(connectionId).collection("userConnections").doc(userId).delete();
+
+          const timelinePostsRefSelf = admin.firestore().collection("timeline").doc(connectionId).collection("timelinePosts").where("ownerId", "==", userId);
+          const timelinePostsRefConnection = admin.firestore().collection("timeline").doc(userId).collection("timelinePosts").where("ownerId", "==", connectionId);
+          const querySnapshotSelf = await timelinePostsRefSelf.get();
+          const querySnapshotConnection = await timelinePostsRefConnection.get();
+
+          querySnapshotSelf.forEach(doc => {
+            if (doc.exists) {
+              doc.ref.delete();
+            }
+          });
+          querySnapshotConnection.forEach(doc => {
+            if (doc.exists) {
+              doc.ref.delete();
+            }
+          });
+      });
 
   exports.onCreatePost = functions.firestore
     .document('/all_posts/{postId}')
@@ -272,7 +310,7 @@ exports.maintainTimestamps = functions.firestore
           return;
         }
 
-        // Update the user's post (this will trigger the update for connection's timeline)
+        // Update the user's post (this will trigger the update for connections' timelines)
         admin.firestore().collection("all_posts").doc(postId).set(newPostData)
     });
 
