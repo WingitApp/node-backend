@@ -431,7 +431,17 @@ exports.onActivityCreatePushNotifs = functions.firestore
         notification: {
             body,
             sound: "default"
-        }
+        },
+        data: {
+          activityId: data.activityId,
+          comment: data.comment,
+          mediaUrl: data.mediaUrl,
+          postId: data.postId,
+          type: data.type,
+          userAvatar: data.userAvatar,
+          userId: data.userId,
+          username: data.username,
+        },
       }
 
       try {
