@@ -232,8 +232,6 @@ exports.maintainTimestamps = functions.firestore
       } 
     });
 
-
-
     exports.onUpdateReferral = functions.firestore
     .document('/referrals/{referralId}')
     .onUpdate(async (snapshot, context) => {
@@ -375,14 +373,16 @@ exports.maintainTimestamps = functions.firestore
         .onDelete(async (snapshot, context) => {
             const deletedUserId = context.params.userId;
 
-            const connectionsForDeletedUserRef = admin.firestore().collection("connections").doc("deletedId").collection("userConnections");
+            const connectionsForDeletedUserRef = admin.firestore().collection("connections").doc(deletedUserId).collection("userConnections");
             const connectionsForDeletedUser = await connectionsForDeletedUserRef.get();
 
+            const connectionDeleteCalls = []
             connectionsForDeletedUser.forEach(doc => {
               if (doc.exists) {
-                doc.ref.delete();
+                connectionDeleteCalls.push(doc.ref.delete());
               }
             });
+            await Promise.all(connectionDeleteCalls);
         });
 
 // Listens for bumps/referrals
