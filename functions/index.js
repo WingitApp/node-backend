@@ -14,7 +14,7 @@ exports.maintainTimestamps = functions.firestore
 .onWrite(async (change, context) => {
 
     // the collections you want to trigger
-    const setCols = ['all_posts', 'timeline'];
+    const setCols = ['all_posts', 'timeline', 'users'];
 
     // if not one of the collections listed above, return
     if (setCols.indexOf(context.params.colId) === -1) {
